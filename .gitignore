@@ -8,7 +8,7 @@
 *.elf
 
 # Exec file
-prog
+/prog
 
 # Linker output
 *.ilk
