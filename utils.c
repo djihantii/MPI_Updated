@@ -3,8 +3,10 @@
 #include <string.h>
 #include <assert.h>
 #include "utils.h"
+#include <time.h>
+#include <unistd.h>
+#define WAIT_LENGHT 20
 
-#define WAIT_LENGHT 200
 
 int in(int * tab, int length, int val) {
         int i;
@@ -26,7 +28,7 @@ void printTab(const char * title, int * tab, int length) {
 void readAndInterpreteFile(const char * filename, int nprocess,  int rank, int ** sources, int ** degrees, int ** destinations, int ** weights) {
         FILE * file =  fopen(filename , "r");
         char * aLine = NULL;
-        int scanf_nbread, s, d, line_number = 1, local_dest, i; 
+        int scanf_nbread, s, d, line_number = 1, local_dest, i;
         size_t len;
         ssize_t read;
         *sources = calloc(1, sizeof(int));
@@ -39,7 +41,7 @@ void readAndInterpreteFile(const char * filename, int nprocess,  int rank, int *
         assert (file != NULL);
         assert (nprocess > 0);
         assert (rank >= 0);
-        **sources = rank; 
+        **sources = rank;
         while((read = getline(&aLine , &len, file)) != -1 ){
                 scanf_nbread = sscanf(aLine, "%d-%d", &s, &d);
                 //printf("line : %s", aLine);
@@ -58,23 +60,23 @@ void readAndInterpreteFile(const char * filename, int nprocess,  int rank, int *
                                 }
                                 if (!in( *destinations, **degrees, local_dest)) {
                                         (* destinations)[**degrees] = local_dest;
-                                        (**degrees)++; 
+                                        (**degrees)++;
                                 }
-                                
+
                         }
                 }
                 line_number ++;
         }
-        if (aLine) free(aLine);
+        //if (aLine) free(aLine);
         fclose(file);
 }
 
 
-topo_t create_topo(char * filename, MPI_Comm old_comm){
+topo_t create_topo(const char * filename, MPI_Comm old_comm){
         topo_t res;
         MPI_Comm new_comm;
         int rank, size, *sources, * degrees, * destinations, * weights;
-        int *nsources, * ndestinations, * noweights, * niweights, indegree, outdegree, weighted;
+        int *nsources, * ndestinations = NULL, * noweights, * niweights, indegree, outdegree, weighted;
         MPI_Comm_rank(old_comm, &rank);
     	MPI_Comm_size(old_comm, &size);
         readAndInterpreteFile(filename, size,  rank, &sources, &degrees, &destinations, &weights);
@@ -84,6 +86,7 @@ topo_t create_topo(char * filename, MPI_Comm old_comm){
         ndestinations = calloc(outdegree, sizeof(int));
         niweights = calloc(size, sizeof(int));
         noweights = calloc(size, sizeof(int));
+        assert(ndestinations != NULL);
         MPI_Dist_graph_neighbors(new_comm, indegree, nsources, niweights, size, ndestinations, noweights);
         res.voisins = ndestinations;
         res.lon_v = outdegree;
@@ -95,34 +98,33 @@ topo_t create_topo(char * filename, MPI_Comm old_comm){
         free(destinations);
         free(weights);
         free(nsources);
-        free(niweights);
+        //free(niweights);
         free(noweights);
         return res;
-} 
+}
 
 void envoi_tous_les_voisins_sauf(topo_t my_topo, const void *buf, int count, MPI_Datatype datatype, int tag, MPI_Request *request, int * sauf, int lon_sauf) {
         for(int i = 0; i<my_topo.lon_v; i++) {
                 if (!in(sauf, lon_sauf, my_topo.voisins[i])) {
-                        MPI_Isend(buf, count, datatype, my_topo.voisins[i], tag, my_topo.local_com, request);
+                        void * bcpy = calloc(count, sizeof(datatype));
+                        memcpy(bcpy, buf, count*sizeof(datatype));
+                        printf("[%f]Envoie a %d\n", MPI_Wtime(), my_topo.voisins[i]);
+                        MPI_Isend(bcpy, count, datatype, my_topo.voisins[i], tag, my_topo.local_com, request);
                 }
-                
         }
 }
 
-int attente(topo_t my_topo, void *buf, int count, MPI_Datatype datatype, MPI_Request *request, MPI_Status *status) {
-        int res; 
+int recevoir(topo_t my_topo, void *buf, int count, MPI_Datatype datatype, MPI_Request *request, MPI_Status *status) {
+        int res = 0;
         for(int i = 0; i<WAIT_LENGHT; i++ ) {
-                MPI_Irecv(buf, count, datatype, MPI_ANY_SOURCE, MPI_ANY_TAG, my_topo.local_com, request);
-                MPI_Test(request, &res, status);
-                if(res)
+                MPI_Status mystat;
+                MPI_Iprobe(MPI_ANY_SOURCE, MPI_ANY_TAG, my_topo.local_com, &res, &mystat);
+                if(res){
+                        printf("[%f]Probable reception de %d\n", MPI_Wtime(), mystat.MPI_SOURCE);
+                        MPI_Irecv(buf, count, datatype, mystat.MPI_SOURCE, mystat.MPI_TAG, my_topo.local_com, request);
+                        MPI_Wait(request, status);
                         break;
+                }
         }
-        
         return res;
 }
-
-
-
-
-
-

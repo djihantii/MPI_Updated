@@ -1,4 +1,4 @@
-#ifndef LOCAL_UTILS_MPI 
+#ifndef LOCAL_UTILS_MPI
 #define LOCAL_UTILS_MPI
 
 
@@ -19,10 +19,10 @@ typedef struct {
         int comworld_size;
 } topo_t;
 
-topo_t create_topo(char * filename, MPI_Comm old_comm);
+topo_t create_topo(const char * filename, MPI_Comm old_comm);
 
 void envoi_tous_les_voisins_sauf(topo_t my_topo, const void *buf, int count, MPI_Datatype datatype, int tag, MPI_Request *request, int * sauf, int lon_sauf) ;
 
-int attente(topo_t my_topo, void *buf, int count, MPI_Datatype datatype, MPI_Request *request, MPI_Status *status);
+int recevoir(topo_t my_topo, void *buf, int count, MPI_Datatype datatype, MPI_Request *request, MPI_Status *status);
 
 #endif

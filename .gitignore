@@ -7,6 +7,9 @@
 *.obj
 *.elf
 
+# Exec file
+prog
+
 # Linker output
 *.ilk
 *.map

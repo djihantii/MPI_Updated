@@ -1,0 +1,21 @@
+Changement de nom dans utils : attente devient recevoir.
+
+Notion générale sur le C : assert(cond); Permet de continuer le programme uniquement si la condition est vrai. Si elle est fausse, le programme s'arrête.
+
+Le makefile : 
+        Pour compiler eveil : make eveil.exe
+        Cela verifie si le fichier eveil.c (contenant le main) existe, et le compile en utilisant utils.h et utils.c
+        
+        Pour election, créer un fichier election.c contenant le main, puis le compiler en faisant : make election.exe
+
+        La commande make exec : commenter la première ligne des commandes et decommenter la deuxieme en cas d'erreur. J'ai changé la commande car elle fonctionne comme cela sur mon ordinateur.
+        
+Probème rencontré sur Eveil :
+        * Erreur du type "corrupted size vs. prev_size". Cela serait du à un problème d'accès mémoire que je rencontre en local.
+        Après quelques recherches, j'ai trouvé qu'il était déconseillé de manipuler la variable buf dans Irecv et Isend. (voir https://www.open-mpi.org/doc/v3.1/man3/MPI_Irecv.3.php) 
+        Pour donc éviter les problèmes du à cela, j'ai, dans envoi_tous_les_voisins_sauf, fait des copy du buffeur avant de l'envoyer dans Isend. Pour Irecv, j'ai utilisé MPI_Iprobe pour savoir si un message est en attente, puis je l'ai lu avec MPI_Irecv + MPI_Wait.
+        
+Logique de l'attente : Dans les algo distribué, les proc sont en attente de message puis ils fonts des actions en fonction de ces messages. Sur MPI, il est difficile d'utiliser des fonctions synchronnes car les programmes pourraient ne jamais terminer (attente indefinie d'un message qui pourraient de jamais venir). En utilisant les communications asynchronnes, un autre problème se pose : la modélisation de l'attente et le choix de la terminaison. Pour nous, pour recevoir un message, nous utilisons des boucles : Nous verifions WAIT_LENGHT fois de suite grace à IProbe l'existance d'un message en attente de lecture. Si il n'ya pas de message, nous considérons que rien ne nous a été envoyé. Quant à l'attente, nous faisons LOCAL_WAIT_TIME fois une vérification de la réception d'un message, 
+        Si il y a un message recu dans cet interval [0, LOCAL_WAIT_TIME] alors le message est interprété, l'action est effectuée et l'attente recommence. 
+        Sinon, alors, nous estimons qu'il faut terminer.
+

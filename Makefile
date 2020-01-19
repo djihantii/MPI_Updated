@@ -1,15 +1,21 @@
 CC=mpicc
 CFLAGS= -Wall -g
-OBJECTS= procRecovering.o utils.o
+OBJECTS= utils.o
 NBMach= 7
-Initiateur= 1 5
-
-all: $(OBJECTS)
-	$(CC) $(OBJECTS) $(CFLAGS) -o prog
+Initiateurs= 1
 
 %.o: %.c %.h
 	$(CC) -o $@ -c $< $(CFLAGS)
 
 exec: prog
-	mpirun -n $(NBMach) --xterm -1\! ./prog $(Initiateur)
+	mpirun -n $(NBMach) xterm -hold -e ./prog $(Initiateurs)
+	#mpirun --xterm -1\! -n $(NBMach) ./prog $(Initiateurs)
+
+.SECONDARY: $(OBJECTS)
 	
+clean:
+	rm *.o prog
+
+%.exe: $(OBJECTS)
+	$(CC) -o $*.o -c $*.c $(CFLAGS)
+	$(CC) -o prog $(CFLAGS) $(OBJECTS) $*.o
